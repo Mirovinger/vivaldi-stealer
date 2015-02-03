@@ -12,8 +12,8 @@
 
 #define SIZE_OF_PAGE_OFFSET             16
 #define SIZE_OF_PAGE_HEADER             8
-#define COLUMNS_NUMBER_OF_DB            22
-#define MIN_COLUMNS_DATATYPE_TABLE_LEN  23
+#define NUMBER_OF_COLUMNS               22
+#define MIN_COLUMN_DATATYPE_TABLE_SIZE  23
 
 #define LOGIN_COLUMN    3
 #define PASSWORD_COLUMN 5
@@ -38,7 +38,13 @@ typedef struct page_header_struct {
 void parse_database(byte* mem, dword mem_size);
 void parse_record(byte* record_header);
 byte varint_to_word(byte* mem, word* decoded_number);
-void format_and_print_credentials(byte* login, byte login_len, byte* password, byte password_len, byte* url, byte url_len);
+void format_and_print_credentials(
+    byte* login, 
+    byte login_size, 
+    byte* password, 
+    byte password_size, 
+    byte* url, 
+    byte url_size);
 
 dword main(dword argc, byte *argv[]) {
     byte* db_path = NULL;
@@ -123,10 +129,10 @@ void parse_record(byte* record_header) {
     byte* varint_to_decode = record_header;
     byte varint_size = 0;
 
-    word record_len = 0;
-    word columns_datatype_table_len = 0;
+    word record_size = 0;
+    word column_datatype_table_size = 0;
     word column_datatype = 0;
-    byte length_of_columns[COLUMNS_NUMBER_OF_DB];
+    byte size_of_columns[NUMBER_OF_COLUMNS];
 
     byte i;
 
@@ -134,60 +140,61 @@ void parse_record(byte* record_header) {
     byte* password = NULL;
     byte* url = NULL;
 
-    // Read 1'st field, the length of record
-    varint_size = varint_to_word(varint_to_decode, &record_len);
+    // Read 1'st field, the size of record
+    varint_size = varint_to_word(varint_to_decode, &record_size);
     varint_to_decode += varint_size;
 
     // Skip 2'nd field, record id
     varint_to_decode++;
 
-    // Get 3'rd field, the length of the columns datatype table in bytes.
-    varint_size = varint_to_word(varint_to_decode, &columns_datatype_table_len);
+    // Get 3'rd field, the size of the column datatype table in bytes.
+    varint_size = varint_to_word(varint_to_decode, &column_datatype_table_size);
     varint_to_decode += varint_size;
 
     // It may be a record we don't search, i.e. from an other table
-    if (columns_datatype_table_len < MIN_COLUMNS_DATATYPE_TABLE_LEN) {
+    if (column_datatype_table_size < MIN_COLUMN_DATATYPE_TABLE_SIZE) {
         return;
     }
 
     // Now we have to decode an every entry from 0 to 7 in this table and determine
-    // a length of them.
-    for (i = 0; i < COLUMNS_NUMBER_OF_DB; i++) {
+    // a size of them.
+    for (i = 0; i < NUMBER_OF_COLUMNS; i++) {
         varint_size = varint_to_word(varint_to_decode, &column_datatype);
         varint_to_decode += varint_size;
 
         if (column_datatype == 1) {
-            length_of_columns[i] = 1;
+            size_of_columns[i] = 1;
         } else if (column_datatype == 6) {
-            length_of_columns[i] = 4;
+            size_of_columns[i] = 4;
         } else if (column_datatype >= 12 && column_datatype % 2 == 0) {
-            length_of_columns[i] = (column_datatype - 12) / 2;
+            size_of_columns[i] = (column_datatype - 12) / 2;
         } else if (column_datatype >= 13 && column_datatype % 2 == 1) {
-            length_of_columns[i] = (column_datatype - 13) / 2;
+            size_of_columns[i] = (column_datatype - 13) / 2;
         }
     }
 
     // After all, read the login (4), password (6) and url (8) fields 
     // and print them
     login = varint_to_decode
-            + length_of_columns[0]
-            + length_of_columns[1]
-            + length_of_columns[2];
+            + size_of_columns[0]
+            + size_of_columns[1]
+            + size_of_columns[2];
 
     password = login
-            + length_of_columns[3]
-            + length_of_columns[4];
+            + size_of_columns[3]
+            + size_of_columns[4];
 
     url = password
-            + length_of_columns[5]
-            + length_of_columns[6];
+            + size_of_columns[5]
+            + size_of_columns[6];
 
-    format_and_print_credentials(   login, 
-                                    length_of_columns[LOGIN_COLUMN], 
-                                    password, 
-                                    length_of_columns[PASSWORD_COLUMN], 
-                                    url, 
-                                    length_of_columns[URL_COLUMN]);
+    format_and_print_credentials(
+        login, 
+        size_of_columns[LOGIN_COLUMN], 
+        password, 
+        size_of_columns[PASSWORD_COLUMN], 
+        url, 
+        size_of_columns[URL_COLUMN]);
  
     return;
 }
@@ -206,33 +213,34 @@ byte varint_to_word(byte* mem, word* decoded_number) {
     return sizeof(word);
 }
 
-void format_and_print_credentials(  byte* login, 
-                                    byte login_len, 
-                                    byte* password, 
-                                    byte password_len, 
-                                    byte* url, 
-                                    byte url_len) {
+void format_and_print_credentials(
+        byte* login, 
+        byte login_size, 
+        byte* password, 
+        byte password_size, 
+        byte* url, 
+        byte url_size) {
     void* mem_for_login = NULL;
     void* mem_for_password = NULL;
     void* mem_for_url = NULL;
     static byte record_number = 1;
 
-    mem_for_login = malloc(login_len + 1);
-    mem_for_password = malloc(password_len + 1);
-    mem_for_url = malloc(url_len + 1);
+    mem_for_login = malloc(login_size + 1);
+    mem_for_password = malloc(password_size + 1);
+    mem_for_url = malloc(url_size + 1);
 
     if (!mem_for_login || !mem_for_password || !mem_for_url) {
         printf("Couldn't allocate a memory for the results. Errno = %d\n", errno);
         exit(EXIT_FAILURE);
     }
 
-    memcpy(mem_for_login, login, login_len);
-    memcpy(mem_for_password, password, password_len);
-    memcpy(mem_for_url, url, url_len);
+    memcpy(mem_for_login, login, login_size);
+    memcpy(mem_for_password, password, password_size);
+    memcpy(mem_for_url, url, url_size);
 
-    *(byte*) (mem_for_login + login_len) = 0;
-    *(byte*) (mem_for_password + password_len) = 0;
-    *(byte*) (mem_for_url + url_len) = 0;
+    *(byte*) (mem_for_login + login_size) = 0;
+    *(byte*) (mem_for_password + password_size) = 0;
+    *(byte*) (mem_for_url + url_size) = 0;
 
     printf("#%d record:\n", record_number);
     printf("Login: %s\nPassword: %s\nResource: %s\n\n", mem_for_login, mem_for_password, mem_for_url);

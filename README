@@ -1,8 +1,9 @@
-vivaldi-stealer is a Proof of Concept program which reads an unencrypted
-logins, passwords and urls from a SQLite3 database of Vivaldi browser.
+vivaldi-stealer is a Proof of Concept program which reads an 
+unencrypted logins, passwords and urls from a SQLite3 database 
+of Vivaldi browser v1.0.83.38 (Developer build).
 
 Platform.
-Linux x86, x64.
+Linux.
 
 Compilation.
 make
@@ -20,5 +21,3 @@ Resource: https://domain.org/
 Login: neo
 Password: 12345678
 Resource: http://the.matrix/
-
-...
