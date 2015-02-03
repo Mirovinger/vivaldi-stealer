@@ -1,3 +1,7 @@
+/*
+ * vivaldi-stealer, GPLv2, Copyright 2015, morte.noir
+*/
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
