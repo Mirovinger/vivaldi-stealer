@@ -10,6 +10,7 @@ make
 
 Usage.
 ./vivaldi-stealer <login_data_path>
+<login_data_file> is usually '$HOME/.config/vivaldi/Default/Login Data'.
 
 Sample output.
 #1 record:

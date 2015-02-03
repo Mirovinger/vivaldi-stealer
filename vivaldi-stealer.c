@@ -54,7 +54,7 @@ dword main(dword argc, byte *argv[]) {
 
     if (argc < 2) {
         printf("Usage: %s <login_data_file>\n", argv[0]);
-        printf("\t(<login_data_file> is usually '$HOME/.config/vivaldi/Default/Login Data')\n");
+        printf("\t(<login_data_file> is usually '$HOME/.config/vivaldi/Default/Login Data'.)\n");
         return 0;
     }
    
