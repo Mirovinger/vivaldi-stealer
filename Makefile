@@ -1,2 +1,2 @@
 all:
-	gcc -o vivaldi-stealer vivaldi-stealer.c
+	gcc -g -o vivaldi-stealer vivaldi-stealer.c

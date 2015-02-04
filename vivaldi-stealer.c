@@ -8,7 +8,8 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <byteswap.h>
+
+#define bswap_16(n) ((n & 0xff00) >> 8) | ((n & 0x00ff) << 8)
 
 #define SIZE_OF_PAGE_OFFSET             16
 #define SIZE_OF_PAGE_HEADER             8
@@ -35,10 +36,10 @@ typedef struct page_header_struct {
 
 #pragma pack()
 
-void parse_database(byte* mem, dword mem_size);
-void parse_record(byte* record_header);
+dword parse_database(byte* mem, dword mem_size);
+dword parse_record(byte* record_header);
 byte varint_to_word(byte* mem, word* decoded_number);
-void format_and_print_credentials(
+dword format_and_print_credentials(
     byte* login, 
     byte login_size, 
     byte* password, 
@@ -84,13 +85,14 @@ dword main(dword argc, byte *argv[]) {
 
     munmap(mem, file_size);
     close(fd);
+
     return 0;
 }
 
-void parse_database(byte* mem, dword mem_size) {
+dword parse_database(byte* mem, dword mem_size) {
     byte* page = mem;
     dword page_offset = 0;
-    word size_of_page = __bswap_16(*(mem + SIZE_OF_PAGE_OFFSET));
+    word size_of_page = bswap_16(*(mem + SIZE_OF_PAGE_OFFSET));
 
     word* cells_offset_table = NULL;
     word number_of_cells = 0;
@@ -98,9 +100,9 @@ void parse_database(byte* mem, dword mem_size) {
 
     byte* record_header = NULL;
 
-    word i;
+    word i = 0;
 
-    // Skip the first page
+    // Parse each page except a first
     while ((page_offset += size_of_page) <= mem_size) {
         page += size_of_page;
 
@@ -109,7 +111,7 @@ void parse_database(byte* mem, dword mem_size) {
             continue;
 
         // Get number of cells
-        number_of_cells = __bswap_16(((page_header*) page)->cells_num);
+        number_of_cells = bswap_16(((page_header*) page)->cells_num);
 
         // Parse each record
         cells_offset_table = (word*) (page + sizeof(page_header));
@@ -117,15 +119,19 @@ void parse_database(byte* mem, dword mem_size) {
             // Compute an address of record header
             record_header = page;
             cell_offset = *(cells_offset_table + i);
-            cell_offset = __bswap_16(cell_offset);
+            cell_offset = bswap_16(cell_offset);
             record_header += cell_offset;
 
-            parse_record(record_header);
+            if (parse_record(record_header) == -1) {
+                return -1;
+            }
         }
     }
+
+    return 0;
 }
 
-void parse_record(byte* record_header) {
+dword parse_record(byte* record_header) {
     byte* varint_to_decode = record_header;
     byte varint_size = 0;
 
@@ -153,7 +159,7 @@ void parse_record(byte* record_header) {
 
     // It may be a record we don't search, i.e. from an other table
     if (column_datatype_table_size < MIN_COLUMN_DATATYPE_TABLE_SIZE) {
-        return;
+        return 0;
     }
 
     // Now we have to decode an every entry from 0 to 7 in this table and determine
@@ -188,15 +194,13 @@ void parse_record(byte* record_header) {
             + size_of_columns[5]
             + size_of_columns[6];
 
-    format_and_print_credentials(
+    return format_and_print_credentials(
         login, 
         size_of_columns[LOGIN_COLUMN], 
         password, 
         size_of_columns[PASSWORD_COLUMN], 
         url, 
         size_of_columns[URL_COLUMN]);
- 
-    return;
 }
 
 byte varint_to_word(byte* mem, word* decoded_number) {
@@ -213,7 +217,7 @@ byte varint_to_word(byte* mem, word* decoded_number) {
     return sizeof(word);
 }
 
-void format_and_print_credentials(
+dword format_and_print_credentials(
         byte* login, 
         byte login_size, 
         byte* password, 
@@ -230,8 +234,7 @@ void format_and_print_credentials(
     mem_for_url = malloc(url_size + 1);
 
     if (!mem_for_login || !mem_for_password || !mem_for_url) {
-        printf("Couldn't allocate a memory for the results. Errno = %d\n", errno);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     memcpy(mem_for_login, login, login_size);
@@ -250,4 +253,6 @@ void format_and_print_credentials(
     free(mem_for_url);
     free(mem_for_password);
     free(mem_for_login);
+
+    return 0;
 }
